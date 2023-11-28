@@ -1,6 +1,6 @@
 from skimage.feature import hog
 from skimage.transform import pyramid_gaussian
-from sklearn.externals import joblib
+import joblib
 from skimage import color
 from imutils.object_detection import non_max_suppression
 import imutils
@@ -25,16 +25,20 @@ def sliding_window(image, stepSize, windowSize):# image is the input, step size 
             yield (x, y, image[y: y + windowSize[1], x:x + windowSize[0]])
 #%%
 # Upload the saved svm model:
-model = joblib.load('Inser\Path\of_the_trained\SVM-model\here')
+model = joblib.load('model_name.npy')
 
 # Test the trained classifier on an image below!
 scale = 0
 detections = []
 # read the image you want to detect the object in:
-img= cv2.imread("Insert\Path\of_the_image\here")
+img= cv2.imread("/home/parksw/ml4me/ml4me_final_project/FLIR_ADAS_v2/images_thermal_val/data/video-57kWWRyeqqHs3Byei-frame-004156-Y7kvjvdK9DttPhSBF.jpg")
+# img= cv2.imread("/home/parksw/ml4me/ml4me_final_project/FLIR_ADAS_v2/images_thermal_val/data/video-Qk8msXvMopoYNDdco-frame-000045-yieQMMej7E4MtMrb9.jpg")
+# img= cv2.imread("/home/parksw/Downloads/thermal-ir-comparison-2.webp")
 
+
+img=color.rgb2gray(img)
 # Try it with image resized if the image is too big
-img= cv2.resize(img,(300,200)) # can change the size to default by commenting this code out our put in a random number
+# img= cv2.resize(img,(300,200)) # can change the size to default by commenting this code out our put in a random number
 
 # defining the size of the sliding window (has to be, same as the size of the image in the training data)
 (winW, winH)= (64,128)
@@ -47,13 +51,13 @@ for resized in pyramid_gaussian(img, downscale=1.5): # loop over each layer of t
         # if the window does not meet our desired window size, ignore it!
         if window.shape[0] != winH or window.shape[1] !=winW: # ensure the sliding window has met the minimum size requirement
             continue
-        window=color.rgb2gray(window)
+        # window=color.rgb2gray(window)
         fds = hog(window, orientations, pixels_per_cell, cells_per_block, block_norm='L2')  # extract HOG features from the window captured
         fds = fds.reshape(1, -1) # re shape the image to make a silouhette of hog
         pred = model.predict(fds) # use the SVM model to make a prediction on the HOG features extracted from the window
         
         if pred == 1:
-            if model.decision_function(fds) > 0.6:  # set a threshold value for the SVM prediction i.e. only firm the predictions above probability of 0.6
+            if model.decision_function(fds) > 6:  # set a threshold value for the SVM prediction i.e. only firm the predictions above probability of 0.6
                 print("Detection:: Location -> ({}, {})".format(x, y))
                 print("Scale ->  {} | Confidence Score {} \n".format(scale,model.decision_function(fds)))
                 detections.append((int(x * (downscale**scale)), int(y * (downscale**scale)), model.decision_function(fds),
@@ -68,7 +72,7 @@ rects = np.array([[x, y, x + w, y + h] for (x, y, _, w, h) in detections]) # do 
 sc = [score[0] for (x, y, score, w, h) in detections]
 print("detection confidence score: ", sc)
 sc = np.array(sc)
-pick = non_max_suppression(rects, probs = sc, overlapThresh = 0.3)
+pick = non_max_suppression(rects, probs = sc, overlapThresh = 0)
 
 # the peice of code above creates a raw bounding box prior to using NMS
 # the code below creates a bounding box after using nms on the detections
@@ -78,8 +82,9 @@ pick = non_max_suppression(rects, probs = sc, overlapThresh = 0.3)
 for (xA, yA, xB, yB) in pick:
     cv2.rectangle(img, (xA, yA), (xB, yB), (0,255,0), 2)
 cv2.imshow("Raw Detections after NMS", img)
+
 #### Save the images below
- = cv2.waitKey(0) & 0xFF 
+k = cv2.waitKey(0) & 0xFF 
 if k == 27:             #wait for ESC key to exit
     cv2.destroyAllWindows()
 elif k == ord('s'):
